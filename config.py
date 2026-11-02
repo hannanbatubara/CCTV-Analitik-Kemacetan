@@ -18,7 +18,7 @@ def _env(name, default):
 CAMERAS_FILE = _env("CAMERAS_FILE", "data/cameras.json")
 
 # YOLO model: folder OpenVINO (server CPU) atau file .pt (server GPU)
-MODEL_PATH = _env("MODEL_PATH", "models/best_openvino_model_v2")  # model lama: models/best_openvino_model
+MODEL_PATH = _env("MODEL_PATH", "models/best_openvino_model_v3")  # sebelumnya: v2 (lemah di malam hari), model awal: best_openvino_model
 DEVICE = _env("DEVICE", "")   # "" = otomatis; GPU NVIDIA: "0"; CPU: "cpu"
 CONFIDENCE = _env("CONFIDENCE", 0.4)
 IOU = _env("IOU", 0.5)

@@ -13,9 +13,10 @@ traffic_data.json
 traffic_data.tmp
 docs/validasi_manual/lembar_hitung.txt
 
-# model lama; yang dipakai: models/best_openvino_model_v2
+# model lama; yang dipakai: models/best_openvino_model_v3
 models/best.pt
 models/best_openvino_model/
+models/best_openvino_model_v2/
 
 # catatan lokal, tidak masuk repo
 docs/

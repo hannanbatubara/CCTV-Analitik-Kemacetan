@@ -72,7 +72,7 @@ bytetrack_lowfps.yaml  pengaturan ByteTrack untuk FPS pemrosesan rendah
 Dockerfile, docker-compose.yml, requirements.txt, .env.example
 
 data/cameras.json    daftar kamera: id, nama, lokasi, sumber stream, posisi garis hitung
-models/best_openvino_model_v2/   model yang dipakai (YOLOv8s hasil fine-tune, OpenVINO, 640 px)
+models/best_openvino_model_v3/   model yang dipakai (YOLOv8s hasil fine-tune siang + malam, OpenVINO, 640 px)
 
 tools/
   merge_datasets.py      gabung dataset YOLO ke 4 kelas (peta nama/ID kelas, batas jumlah gambar)
@@ -126,7 +126,7 @@ Semua nilai di `config.py` bisa dioverride lewat environment variable dengan nam
 
 | Variabel | Default | Keterangan |
 |---|---|---|
-| `MODEL_PATH` | `models/best_openvino_model_v2` | Folder OpenVINO (server CPU) atau file `.pt` (server GPU) |
+| `MODEL_PATH` | `models/best_openvino_model_v3` | Folder OpenVINO (server CPU) atau file `.pt` (server GPU) |
 | `DEVICE` | otomatis | `0` untuk GPU NVIDIA, `cpu` untuk CPU |
 | `CONFIDENCE` | `0.4` | Ambang keyakinan deteksi |
 | `IOU` | `0.5` | Ambang NMS |
@@ -189,16 +189,21 @@ Jika database gagal, worker tetap berjalan dan data tetap tersimpan di `.jsonl`.
 
 ## 6. Model
 
-`models/best_openvino_model_v2` adalah YOLOv8s yang di-fine-tune dari model awal proyek dengan dataset gabungan
-(lihat 7.5). Ekspor OpenVINO, input 640 x 640, kelas `0 motorcycle, 1 bus, 2 car, 3 truck`.
+`models/best_openvino_model_v3` adalah YOLOv8s yang di-fine-tune dua kali dari model awal proyek:
+v2 dengan dataset gabungan siang (lihat 7.5), lalu v3 dengan tambahan 200 frame malam Bogor (lihat 7.6).
+Ekspor OpenVINO, input 640 x 640, kelas `0 motorcycle, 1 bus, 2 car, 3 truck`.
 
 | Model | Precision | Recall | mAP50 | mAP50-95 |
 |---|---|---|---|---|
-| Model awal (validasi gabungan 102 gambar) | 0,771 | 0,692 | 0,845 | 0,678 |
-| **Model v2 (validasi yang sama)** | **0,906** | **0,861** | **0,911** | **0,751** |
+| Model awal (validasi gabungan siang, 102 gambar) | 0,771 | 0,692 | 0,845 | 0,678 |
+| Model v2 (validasi yang sama) | 0,906 | 0,861 | 0,911 | 0,751 |
+| Model v2, frame malam Bogor (30 gambar) | 0,365 | 0,218 | 0,228 | 0,094 |
+| **Model v3, frame malam Bogor (30 gambar yang sama)** | **0,821** | **0,814** | **0,827** | **0,573** |
+| Model v2, frame siang Bogor (15 gambar) | 0,865 | 0,761 | 0,855 | 0,680 |
+| **Model v3, frame siang Bogor (15 gambar yang sama)** | **0,842** | **0,766** | **0,885** | **0,691** |
 
-Training ulang: dari bobot model awal, 60 epoch, batch 16, 640 px, Google Colab (GPU T4), notebook `tools/train_colab.ipynb`.
-Loss validasi turun sampai akhir (1,02 -> 0,77), tanpa tanda overfitting.
+- v2: dari bobot model awal, 60 epoch, batch 16, 640 px, Google Colab (GPU T4). Loss validasi turun sampai akhir (1,02 -> 0,77), tanpa tanda overfitting.
+- v3: dari bobot v2, 40 epoch (±30 menit di T4), batch 16, 640 px, notebook `tools/train_colab.ipynb`.
 
 ---
 
@@ -292,6 +297,25 @@ Objek: motor 8.797, mobil 7.365, truk 1.738, bus 912.
 
 **Training** di Colab menghasilkan model v2 (bagian 6).
 
+### 7.6 Deteksi malam
+**Masalah.** Data 2 November (13:00-19:00) menunjukkan rata-rata kendaraan di frame turun tiba-tiba dari 11,6 (17:40) ke 5,6 (17:50)
+lalu tetap ±3, padahal jam pulang kerja. Pada satu frame pukul 18:59 terlihat lebih dari 12 kendaraan, model v2 hanya mendeteksi 6.
+Mobil dengan lampu menyala dan motor yang kabur karena gerak tidak terdeteksi. Penyebabnya: dataset latih hampir semuanya foto siang.
+
+| Percobaan | Hasil | Keputusan |
+|---|---|---|
+| CLAHE (menerangkan frame gelap sebelum deteksi) | Deteksi per frame +30% (22 -> 29 di 6 frame), tetapi rata-rata langsung di stream sama (2,7 vs 3,0) | Tidak dipakai |
+| Confidence diturunkan ke 0,1 | 6 -> 11 deteksi per frame, kendaraan berlampu tetap terlewat | Tidak dipakai |
+| **Fine-tune dengan frame malam** | Lihat bagian 6 dan 8.4 | **Dipakai (v3)** |
+
+**Data malam.** 200 frame diambil dari stream (2 November 2026, 20:00-21:10, satu frame tiap 20 detik).
+Label dibuat dengan auto-label Roboflow. Pada satu frame uji (gratis, mode preview), model yang dibandingkan menemukan:
+GPT-6.1 Terra 18 kendaraan, Gemini 4 Argon 12, model v2 10. Dipilih GPT-6.1 Terra (2 kredit per gambar),
+hasilnya ±14,7 kotak per frame. Terra melabeli angkot hijau sebagai `bus`; di 200 frame ini semua `bus` adalah angkot,
+jadi diubah ke `car`. Label tidak dikoreksi manual satu per satu.
+30 frame terakhir (21:00-21:10) disisihkan sebagai validasi malam, supaya tidak ada frame yang hampir sama di training.
+Objek: motor 1.552, mobil 1.214, truk 41.
+
 ---
 
 ## 8. Hasil validasi
@@ -325,13 +349,26 @@ Server produksi perlu memproses ±15 FPS per kamera (`PROCESS_FPS=15`, `TRACKER=
 Diuji di Docker Desktop (Windows): image ±2,8 GB, worker ±580 MB RAM dan ±2,4 core pada 3 FPS. Worker membaca stream,
 memuat model v2 dari volume, menulis snapshot ke `logs/`, dan API menjawab.
 
+### 8.4 v2 vs v3 di stream malam (langsung, 3 FPS)
+Dijalankan bergantian di stream Balaikota, 2 November 2026 pukul 23:04-23:07, masing-masing ±70 detik:
+
+| | Rata-rata kendaraan di frame | Lewat garis |
+|---|---|---|
+| Model v2 | 0,4 | 0 |
+| **Model v3** | **3,6** | **11** |
+
+Pada satu frame pukul 23:05:41: v2 mendeteksi 0 kendaraan, v3 mendeteksi 6 (mobil dan motor di kejauhan).
+Catatan: frame validasi malam berasal dari malam dan kamera yang sama dengan data training, jadi skor di bagian 6
+kemungkinan sedikit lebih tinggi daripada performa pada malam lain.
+
 ---
 
 ## 9. Sumber data dan lisensi
 
-### Dataset yang dipakai untuk training model v2
+### Dataset yang dipakai untuk training model v2 dan v3
 | Dataset | Tautan | Lisensi | Pemakaian |
 |---|---|---|---|
+| Frame malam CCTV Balaikota Bogor (v3) | [app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1) (privat) | Privat | 200 frame, label auto-label GPT-6.1 Terra (Roboflow) |
 | Traffic (CCTV Indonesia), versi 1 | [universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1](https://universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1) | CC BY 4.0 | Semua gambar; `Bike` -> motor, `Other` dilewati |
 | vehicle-det, versi 1 | [universe.roboflow.com/vehicledet/vehicle-det/dataset/1](https://universe.roboflow.com/vehicledet/vehicle-det/dataset/1) | CC BY 4.0 | 1.000 dari 19.422 gambar, kelas dipetakan per ID |
 | Frame CCTV Balaikota Bogor | [app.roboflow.com/hannan-azhari-batubara/cctv-newak/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-newak/1) (privat) | Privat | 100 frame, diambil dari stream sendiri |
