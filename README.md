@@ -4,10 +4,6 @@ Modul **kemacetan** untuk analitik CCTV lalu lintas: mendeteksi dan melacak kend
 menghitung kendaraan yang melewati garis hitung, dan menentukan tingkat kepadatan (LOW / MEDIUM / HIGH).
 Kamera uji: **Depan Kantor Balaikota Bogor** (stream HLS publik Pemkot Bogor).
 
-Modul ini satu dari tiga modul (kemacetan, kebakaran, kecelakaan) yang masing-masing berjalan di container
-sendiri di server. Repo ini hanya berisi modul kemacetan.
-
----
 
 ## Daftar isi
 1. [Cara kerja](#1-cara-kerja)
