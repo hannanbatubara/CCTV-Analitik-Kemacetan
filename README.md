@@ -89,7 +89,7 @@ bytetrack_lowfps.yaml  pengaturan ByteTrack untuk FPS pemrosesan rendah
 Dockerfile, docker-compose.yml, requirements.txt, .env.example
 
 data/cameras.json    daftar kamera: id, nama, lokasi, sumber stream, posisi garis hitung
-models/best_openvino_model_v3/   model yang dipakai (YOLOv8s hasil fine-tune siang + malam, OpenVINO, 640 px)
+models/best_openvino_model_v4/   model yang dipakai (YOLOv8s hasil fine-tune siang + malam, OpenVINO, 640 px)
 
 tools/
   merge_datasets.py      gabung dataset YOLO ke 4 kelas (peta nama/ID kelas, batas jumlah gambar)
@@ -144,7 +144,7 @@ Semua nilai di `config.py` bisa dioverride lewat environment variable dengan nam
 
 | Variabel | Default | Keterangan |
 |---|---|---|
-| `MODEL_PATH` | `models/best_openvino_model_v3` | Folder OpenVINO (server CPU) atau file `.pt` (server GPU) |
+| `MODEL_PATH` | `models/best_openvino_model_v4` | Folder OpenVINO (server CPU) atau file `.pt` (server GPU) |
 | `DEVICE` | otomatis | `0` untuk GPU NVIDIA, `cpu` untuk CPU |
 | `CONFIDENCE` | `0.4` | Ambang keyakinan deteksi |
 | `IOU` | `0.5` | Ambang NMS |
@@ -214,9 +214,25 @@ Jika database gagal, worker tetap berjalan dan data tetap tersimpan di `.jsonl`.
 
 ## 6. Model
 
-`models/best_openvino_model_v3` adalah YOLOv8s yang di-fine-tune dua kali dari model awal proyek:
-v2 dengan dataset gabungan siang (lihat 7.5), lalu v3 dengan tambahan 200 frame malam Bogor (lihat 7.6).
-Ekspor OpenVINO, input 640 x 640, kelas `0 motorcycle, 1 bus, 2 car, 3 truck`.
+`models/best_openvino_model_v4` adalah YOLOv8s yang di-fine-tune tiga kali dari model awal proyek:
+v2 dengan dataset gabungan siang (lihat 7.5), v3 dengan tambahan 200 frame malam Bogor (lihat 7.6),
+lalu v4 dengan label siang Bogor yang diperbaiki (lihat 7.8). Ekspor OpenVINO, input 640 x 640,
+kelas `0 motorcycle, 1 bus, 2 car, 3 truck`. Model sebelumnya tidak disimpan di repo (ada di riwayat git dan Google Drive).
+
+**Skor terbaru** (label siang dan malam Bogor dari auto-label, lihat 7.6 dan 7.8):
+
+| Model | Siang Bogor, 15 gambar (P / R / mAP50 / mAP50-95) | Malam Bogor, 30 gambar (P / R / mAP50 / mAP50-95) |
+|---|---|---|
+| Model awal | 0,736 / 0,666 / 0,659 / 0,389 | 0,445 / 0,221 / 0,254 / 0,097 |
+| v2 | 0,859 / 0,652 / 0,735 / 0,452 | 0,365 / 0,218 / 0,228 / 0,094 |
+| v3 | 0,835 / 0,635 / 0,729 / 0,458 | 0,821 / 0,814 / 0,827 / 0,573 |
+| **v4 (dipakai)** | **0,931 / 0,684 / 0,828 / 0,608** | 0,694 / 0,737 / 0,709 / 0,462 |
+
+Rata-rata malam v4 turun karena kelas truk, yang hanya punya 4 contoh di validasi malam (mAP50 0,656 -> 0,331).
+Untuk motor (240 contoh) dan mobil (136) v4 hampir sama dengan v3: 0,932 -> 0,928 dan 0,893 -> 0,869.
+v4 dipilih karena siang (waktu paling ramai) naik ±10 poin mAP50.
+
+Skor lama sebelum label siang diperbaiki (label dari model awal sendiri, jadi skor siang terlalu tinggi):
 
 | Model | Precision | Recall | mAP50 | mAP50-95 |
 |---|---|---|---|---|
@@ -228,7 +244,8 @@ Ekspor OpenVINO, input 640 x 640, kelas `0 motorcycle, 1 bus, 2 car, 3 truck`.
 | **Model v3, frame siang Bogor (15 gambar yang sama)** | **0,842** | **0,766** | **0,885** | **0,691** |
 
 - v2: dari bobot model awal, 60 epoch, batch 16, 640 px, Google Colab (GPU T4). Loss validasi turun sampai akhir (1,02 -> 0,77), tanpa tanda overfitting.
-- v3: dari bobot v2, 40 epoch (±30 menit di T4), batch 16, 640 px, notebook `tools/train_colab.ipynb`.
+- v3: dari bobot v2, 40 epoch (±30 menit di T4), batch 16, 640 px.
+- v4: dari bobot v3, 40 epoch, batch 16, 640 px, notebook `tools/train_colab.ipynb`.
 
 ---
 
@@ -366,6 +383,27 @@ Batas jumlah (`LOW_THRESHOLD` / `MEDIUM_THRESHOLD`) juga perlu dikalibrasi ulang
 (klip siang yang ramai: rata-rata 18,6 di seluruh frame -> 8,5 di area hitung). Kendaraan yang berhenti sebentar
 (mis. memberi jalan penyeberang di zebra cross) bisa membuat status sesaat MACET; jendela 60 detik meredam sebagian.
 
+### 7.8 Label siang Bogor diperbaiki (model v4)
+**Masalah.** 100 frame siang Bogor (7.5) masih berlabel hasil model awal, hanya dengan perbaikan otomatis tanaman dan angkot.
+Pada frame 11:34:29 misalnya, mobil putih dilabeli motor dan motor di kiri bawah tidak berlabel. Karena 15 di antaranya
+dipakai sebagai validasi siang, skor siang ikut keliru: model diuji dengan label buatan model sendiri.
+
+**Perbaikan.** Ke-100 frame diberi label ulang dengan auto-label Roboflow GPT-6.1 Terra (project CCTV Siang): 2.785 kotak
+(label lama 2.064). Terra melabeli angkot sebagai `bus`. Dari 110 kotak `bus`, semua dicek visual:
+bus kota asli (abu-abu/putih) punya porsi piksel hijau <= 0,07, angkot >= 0,13. Kotak `bus` dengan porsi hijau >= 0,10
+diubah ke `car` (79 kotak), 31 bus kota tetap `bus`. Label lama disimpan di luar repo (`dataset/bogor_label_lama/`).
+
+| Model | Siang, label lama (mAP50) | Siang, label baru (mAP50) |
+|---|---|---|
+| v2 | 0,855 | 0,735 |
+| v3 | 0,885 | 0,729 |
+| **v4** | - | **0,828** |
+
+Skor siang sebelumnya terlalu tinggi; dengan label yang benar model awal sampai v3 hanya menangkap ±65% kendaraan siang
+(kebanyakan yang terlewat adalah kendaraan kecil di kejauhan). v4 dilatih dari v3 dengan label baru ini.
+Di klip siang 80 detik (3 FPS) v4 menghitung 95 kendaraan lewat garis, v3 77.
+Kecepatan normal di klip yang sama: v3 0,97, v4 0,82, jadi `FREE_FLOW_SPEED` perlu dikalibrasi ulang dengan v4.
+
 ---
 
 ## 8. Hasil validasi
@@ -415,13 +453,13 @@ kemungkinan sedikit lebih tinggi daripada performa pada malam lain.
 
 ## 9. Sumber data dan lisensi
 
-### Dataset yang dipakai untuk training model v2 dan v3
+### Dataset yang dipakai untuk training model v2 sampai v4
 | Dataset | Tautan | Lisensi | Pemakaian |
 |---|---|---|---|
 | Frame malam CCTV Balaikota Bogor (v3) | [app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1) (privat) | Privat | 200 frame, label auto-label GPT-6.1 Terra (Roboflow) |
 | Traffic (CCTV Indonesia), versi 1 | [universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1](https://universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1) | CC BY 4.0 | Semua gambar; `Bike` -> motor, `Other` dilewati |
 | vehicle-det, versi 1 | [universe.roboflow.com/vehicledet/vehicle-det/dataset/1](https://universe.roboflow.com/vehicledet/vehicle-det/dataset/1) | CC BY 4.0 | 1.000 dari 19.422 gambar, kelas dipetakan per ID |
-| Frame CCTV Balaikota Bogor | [app.roboflow.com/hannan-azhari-batubara/cctv-newak/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-newak/1) (privat) | Privat | 100 frame, diambil dari stream sendiri |
+| Frame siang CCTV Balaikota Bogor (label v4) | [app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1) (privat) | Privat | 100 frame dari stream sendiri, label auto-label GPT-6.1 Terra (angkot -> car); label lama di project `cctv-newak` |
 
 ### Dataset yang dipertimbangkan tetapi tidak dipakai
 | Dataset | Tautan | Alasan |
