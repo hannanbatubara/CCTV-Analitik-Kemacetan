@@ -28,6 +28,8 @@ class VideoStream:
         self.ended = False
 
         self.cap = None
+        self.time = 0.0  # waktu video (detik) dari frame terakhir yang dikembalikan read()
+        self._fps = DEFAULT_STREAM_FPS
         self._queue = deque(maxlen=4)
         self._cond = threading.Condition()
         self._running = True
@@ -48,6 +50,7 @@ class VideoStream:
         if ok:
             fps = self.cap.get(cv2.CAP_PROP_FPS)
             fps = fps if fps and 1 < fps <= 120 else DEFAULT_STREAM_FPS
+            self._fps = fps
             self.stride = max(1, round(fps / PROCESS_FPS))
         return ok
 
@@ -67,7 +70,7 @@ class VideoStream:
             ret, frame = self.cap.retrieve()
             if ret:
                 with self._cond:
-                    self._queue.append(frame)
+                    self._queue.append((i / self._fps, frame))
                     self._cond.notify()
 
     def read(self):
@@ -76,10 +79,14 @@ class VideoStream:
             with self._cond:
                 if not self._queue:
                     self._cond.wait(timeout=2.0)
-                return self._queue.popleft() if self._queue else None
+                if not self._queue:
+                    return None
+                self.time, frame = self._queue.popleft()
+                return frame
 
         ret, frame = self.cap.read()
         if ret:
+            self.time = self.cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
             return frame
         if self.loop:
             self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)

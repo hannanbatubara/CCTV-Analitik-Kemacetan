@@ -21,6 +21,8 @@ traffic_snapshots = Table(
     Column("camera_id", String(64), nullable=False),
     Column("location", String(128)),
     Column("timestamp", DateTime(timezone=True), nullable=False),
+    Column("status", String(16)),     # LANCAR / RAMAI / MACET
+    Column("speed_ratio", Float),     # kecepatan / kecepatan normal; NULL jika tidak ada kendaraan bergerak
     Column("density", String(16), nullable=False),
     Column("vehicles_in_frame", Integer, nullable=False),
     Column("avg_vehicles_in_frame", Float, nullable=False),
@@ -45,6 +47,8 @@ class Database:
             "camera_id": data["camera_id"],
             "location": data.get("location"),
             "timestamp": datetime.fromisoformat(data["timestamp"]),
+            "status": t["status"],
+            "speed_ratio": t["speed_ratio"],
             "density": t["density"],
             "vehicles_in_frame": t["vehicles_in_frame"],
             "avg_vehicles_in_frame": t["avg_vehicles_in_frame"],

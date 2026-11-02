@@ -1,7 +1,8 @@
 # CCTV Analitik Kemacetan
 
 Modul **kemacetan** untuk analitik CCTV lalu lintas: mendeteksi dan melacak kendaraan dari stream CCTV,
-menghitung kendaraan yang melewati garis hitung, dan menentukan tingkat kepadatan (LOW / MEDIUM / HIGH).
+menghitung kendaraan yang melewati garis hitung, dan menentukan status jalan (**LANCAR / RAMAI / MACET**)
+dari jumlah kendaraan dan kecepatannya.
 Kamera uji: **Depan Kantor Balaikota Bogor** (stream HLS publik Pemkot Bogor).
 
 
@@ -28,13 +29,13 @@ Deteksi + tracking
    │  detector.py       YOLOv8s (OpenVINO) + ByteTrack
    ▼
 State per kendaraan
-   │  tracker.py        posisi sebelumnya, voting kelas, bersihkan track lama
+   │  tracker.py        posisi sebelumnya, kecepatan (perpindahan ±1 detik), voting kelas, bersihkan track lama
    ▼
 Hitung lewat garis
    │  counter.py        dihitung sekali per kendaraan saat melintasi garis, arah in/out
    ▼
-Analisis kepadatan
-   │  traffic.py        density dari rata-rata kendaraan di frame dalam 60 detik terakhir
+Analisis kemacetan
+   │  traffic.py        jumlah & kecepatan kendaraan di area hitung (ROI) dalam 60 detik terakhir -> status
    ▼
 Output
       output.py / db.py / api.py   JSON tiap 10 detik, riwayat .jsonl, database, REST API
@@ -44,13 +45,29 @@ Metrik yang dihasilkan:
 
 | Metrik | Arti |
 |---|---|
-| `vehicles_in_frame` | Jumlah kendaraan yang terlihat di frame saat ini |
-| `avg_vehicles_in_frame` | Rata-rata kendaraan di frame selama jendela waktu (default 60 detik) |
-| `density` | LOW / MEDIUM / HIGH berdasarkan `avg_vehicles_in_frame` dan dua batas di `config.py` |
+| `status` | **LANCAR / RAMAI / MACET**, lihat aturan di bawah |
+| `speed` | Median kecepatan kendaraan di area hitung, dalam "panjang kendaraan per detik" (perpindahan / tinggi kotak) |
+| `speed_ratio` | `speed` dibagi kecepatan normal saat jalan sepi (`FREE_FLOW_SPEED`); `null` jika tidak ada kendaraan bergerak |
+| `vehicles_in_frame` | Jumlah kendaraan di area hitung saat ini |
+| `avg_vehicles_in_frame` | Rata-rata kendaraan di area hitung selama jendela waktu (default 60 detik) |
+| `density` | LOW / MEDIUM / HIGH berdasarkan `avg_vehicles_in_frame` saja (dipertahankan untuk kompatibilitas) |
 | `flow_in_window` | Kendaraan yang melewati garis dalam jendela waktu terakhir, per kelas |
 | `total_crossed` | Total kendaraan yang melewati garis sejak worker berjalan, per kelas dan arah (`in` = ke bawah layar, `out` = ke atas) |
 
 Kelas kendaraan: `motorcycle`, `bus`, `car`, `truck` (angkot dihitung sebagai `car`).
+
+**Aturan status.** Jumlah kendaraan saja tidak cukup: 20 kendaraan yang melaju berarti ramai tapi lancar,
+20 kendaraan yang diam berarti macet. Karena itu status memakai jumlah **dan** kecepatan:
+
+| Kondisi (dalam 60 detik terakhir) | Status |
+|---|---|
+| rata-rata di area hitung >= `LOW_THRESHOLD` dan `speed_ratio` < `JAM_SPEED_RATIO` (0,3) | **MACET** |
+| rata-rata di area hitung >= `MEDIUM_THRESHOLD` | **RAMAI** |
+| selain itu | **LANCAR** |
+
+Kecepatan dinormalisasi dengan tinggi kotak, jadi kendaraan dekat dan jauh sebanding tanpa perlu mengukur jalan dalam meter.
+**Area hitung** (`roi` di `cameras.json`) hanya mencakup badan jalan yang dipakai berjalan; lajur parkir dan trotoar tidak ikut,
+supaya mobil parkir tidak menambah jumlah dan tidak terbaca sebagai kendaraan yang diam (macet). Garis hitung tetap berlaku untuk semua kendaraan.
 
 ---
 
@@ -134,15 +151,19 @@ Semua nilai di `config.py` bisa dioverride lewat environment variable dengan nam
 | `TRACKER` | `bytetrack_lowfps.yaml` | Pakai `bytetrack.yaml` di server cepat (>= 10 FPS) |
 | `PROCESS_FPS` | `3` | Frame yang dianalisis per detik video. **Sangat menentukan akurasi**, lihat bagian 8 |
 | `DENSITY_WINDOW_SECONDS` | `60` | Panjang jendela waktu untuk density dan flow |
-| `LOW_THRESHOLD` / `MEDIUM_THRESHOLD` | `8` / `20` | Batas density (rata-rata kendaraan di frame). Perlu dikalibrasi per kamera |
+| `LOW_THRESHOLD` / `MEDIUM_THRESHOLD` | `8` / `20` | Batas jumlah (rata-rata kendaraan di area hitung). Perlu dikalibrasi per kamera |
+| `FREE_FLOW_SPEED` | `1.0` | Kecepatan normal saat jalan sepi. Dikalibrasi dengan `tools/calibrate_density.py` **pada `PROCESS_FPS` yang sama** (3 FPS: ±1,0; 15 FPS: ±1,6) |
+| `JAM_SPEED_RATIO` | `0.3` | Di bawah 30% kecepatan normal + jalan ramai = MACET |
 | `SAVE_INTERVAL` | `10` | Detik antar snapshot |
 | `DATABASE_URL` | kosong | Contoh `postgresql+psycopg2://user:pass@host:5432/db`. Kosong = tanpa database |
 | `CAMERAS_FILE` | `data/cameras.json` | Daftar kamera |
 
-Garis hitung per kamera diatur di `data/cameras.json` dengan koordinat relatif 0..1 (tidak bergantung resolusi):
+Garis hitung dan area hitung per kamera diatur di `data/cameras.json` dengan koordinat relatif 0..1 (tidak bergantung resolusi):
 ```json
-"line": {"x1": 0.0, "y1": 0.4, "x2": 1.0, "y2": 0.4}
+"line": {"x1": 0.0, "y1": 0.4, "x2": 1.0, "y2": 0.4},
+"roi": [[0.4, 0.2], [0.6, 0.2], [0.47, 0.75], [0.41, 1.0], [0, 1.0], [0, 0.5]]
 ```
+Tanpa `roi`, seluruh frame dipakai.
 
 ---
 
@@ -163,6 +184,9 @@ Contoh snapshot:
   "lane": 2,
   "timestamp": "2026-10-29T08:49:10+07:00",
   "traffic": {
+    "status": "LANCAR",
+    "speed": 0.98,
+    "speed_ratio": 0.98,
     "density": "MEDIUM",
     "window_seconds": 60,
     "vehicles_in_frame": 9,
@@ -182,7 +206,7 @@ API (baca saja):
 | `GET /traffic/latest` | Snapshot terbaru |
 | `GET /traffic/history?limit=60&date=YYYYMMDD` | Snapshot terakhir dari log harian |
 
-Kolom tabel database: `module`, `camera_id`, `location`, `timestamp`, `density`, `vehicles_in_frame`,
+Kolom tabel database: `module`, `camera_id`, `location`, `timestamp`, `status`, `speed_ratio`, `density`, `vehicles_in_frame`,
 `avg_vehicles_in_frame`, `flow_in_window`, `total_crossed`, dan `detail` (JSON rincian per kelas dan arah).
 Jika database gagal, worker tetap berjalan dan data tetap tersimpan di `.jsonl`.
 
@@ -316,6 +340,31 @@ hasilnya ±14,7 kotak per frame. Terra melabeli angkot hijau sebagai `bus`; di 2
 jadi diubah ke `car`. Label tidak dikoreksi manual satu per satu.
 30 frame terakhir (21:00-21:10) disisihkan sebagai validasi malam, supaya tidak ada frame yang hampir sama di training.
 Objek: motor 1.552, mobil 1.214, truk 41.
+
+### 7.7 Dari "density" ke status kemacetan
+**Masalah.** Density versi awal hanya rata-rata jumlah kendaraan di frame, dengan batas dari persentil data sendiri
+(±1/3 waktu otomatis LOW, ±1/5 HIGH). Itu mengukur *seberapa ramai dibanding biasanya*, bukan macet atau tidak:
+jalan ramai yang lancar dan jalan macet bisa punya jumlah yang sama. Selain itu 5-10 mobil yang parkir malam hari
+di lajur kanan selalu ikut terhitung.
+
+**Perubahan.** Status LANCAR / RAMAI / MACET dari jumlah dan kecepatan (bagian 1), dengan area hitung tanpa lajur parkir.
+
+| Percobaan | Hasil | Keputusan |
+|---|---|---|
+| Area hitung awal: seluruh jalan sampai ujung frame, tanpa lajur parkir | Malam (jalan sepi) kecepatan naik-turun 0,07-0,67x normal: kendaraan yang berhenti di zebra cross dan motor di trotoar ikut terukur | Diperkecil |
+| **Area hitung: badan jalan dari zebra cross sampai kamera** | Malam stabil 0,94-1,14x normal | **Dipakai** |
+| Kecepatan antar frame berturut-turut | Klip siang di 15 FPS 1,93 vs stream malam di 3 FPS 1,0: getaran kotak antar frame ikut terhitung | Diganti |
+| **Kecepatan dari perpindahan ±1 detik** | 15 FPS 1,6; klip yang sama diturunkan ke 3 FPS 0,95; stream malam 3 FPS 1,05 | **Dipakai** |
+| Uji kendaraan diam: area hitung sementara hanya lajur parkir | Kecepatan 0,01-0,02x normal, status MACET | Logika benar |
+
+**Catatan.** Pada 3 FPS motor yang cepat lebih sering putus tracking-nya, jadi kecepatan terukur lebih rendah daripada di 15 FPS.
+Karena itu `FREE_FLOW_SPEED` harus dikalibrasi pada `PROCESS_FPS` yang sama dengan server (3 FPS: ±1,0).
+Siang (klip, 3 FPS) dan malam (stream, 3 FPS) memberi kecepatan normal yang hampir sama (0,95 dan 1,05).
+
+Belum diuji pada kemacetan sungguhan: data 2-3 November tidak berisi kejadian macet yang sudah dipastikan.
+Batas jumlah (`LOW_THRESHOLD` / `MEDIUM_THRESHOLD`) juga perlu dikalibrasi ulang karena area hitung lebih kecil
+(klip siang yang ramai: rata-rata 18,6 di seluruh frame -> 8,5 di area hitung). Kendaraan yang berhenti sebentar
+(mis. memberi jalan penyeberang di zebra cross) bisa membuat status sesaat MACET; jendela 60 detik meredam sebagian.
 
 ---
 

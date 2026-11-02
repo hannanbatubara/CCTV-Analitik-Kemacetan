@@ -10,6 +10,7 @@ import signal
 import time
 
 import cv2
+import numpy as np
 
 from config import CAMERAS_FILE, DEFAULT_LINE, PROCESS_FPS, SAVE_INTERVAL, VEHICLE_CLASSES
 from counter import LineCounter
@@ -49,18 +50,34 @@ def draw_box_and_label(frame, box, label, color):
     cv2.putText(frame, label, (x1 + 5, y1 - 5), font, scale, (255, 255, 255), thick, cv2.LINE_AA)
 
 
-def draw_overlay(frame, camera_name, traffic_result, line):
+STATUS_COLORS = {"LANCAR": (0, 200, 0), "RAMAI": (0, 200, 255), "MACET": (0, 0, 255)}
+
+
+def roi_pixels(roi, shape):
+    """Area hitung (koordinat relatif 0..1 di cameras.json) -> polygon piksel; None = seluruh frame."""
+    if not roi:
+        return None
+    h, w = shape[:2]
+    return np.array([(x * w, y * h) for x, y in roi], np.int32)
+
+
+def draw_overlay(frame, camera_name, traffic_result, line, roi):
     t = traffic_result
+    if roi is not None:
+        cv2.polylines(frame, [roi], True, (255, 255, 0), 2)
     cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3)
     cv2.putText(frame, f"Camera: {camera_name}", (20, 35),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(frame, f"Density: {t['density']} | In frame: {t['vehicles_in_frame']} "
+    speed = f"{t['speed_ratio'] * 100:.0f}% normal" if t["speed_ratio"] is not None else "-"
+    cv2.putText(frame, f"Status: {t['status']} | Kecepatan: {speed}", (20, 75),
+                cv2.FONT_HERSHEY_SIMPLEX, 1.0, STATUS_COLORS[t["status"]], 3, cv2.LINE_AA)
+    cv2.putText(frame, f"In frame: {t['vehicles_in_frame']} (avg {t['avg_vehicles_in_frame']}) "
                        f"| Flow/{t['window_seconds']}s: {t['flow_in_window']['total']}",
-                (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
+                (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2, cv2.LINE_AA)
     per_class = "  ".join(
         f"{c}: {sum(v.values())}" for c, v in t["total_crossed"]["detail"].items()
     )
-    cv2.putText(frame, f"Crossed {t['total_crossed']['total']} | {per_class}", (20, 105),
+    cv2.putText(frame, f"Crossed {t['total_crossed']['total']} | {per_class}", (20, 145),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2, cv2.LINE_AA)
 
 
@@ -116,6 +133,8 @@ def main():
 
         result = detector.detect(frame)
         in_frame = 0
+        speeds = []
+        roi = roi_pixels(camera.get("roi"), frame.shape)
 
         if result.boxes.id is not None:
             boxes = result.boxes.xyxy.cpu().numpy()
@@ -127,13 +146,20 @@ def main():
                 if class_name not in VEHICLE_CLASSES:
                     continue
 
-                in_frame += 1
                 track_id = int(track_id)
                 x1, y1, x2, y2 = map(int, box)
                 point = ((x1 + x2) / 2, y2)  # tengah-bawah box ~ posisi di jalan
 
-                prev = tracker.update(track_id, class_name, point, frame_idx)
+                prev = tracker.update(track_id, class_name, point, frame_idx,
+                                      now=stream.time, size=y2 - y1)
                 voted_cls, _ = tracker.label(track_id)
+
+                # jumlah & kecepatan hanya di area hitung (mis. tanpa lajur parkir);
+                # garis hitung tetap untuk semua kendaraan
+                if roi is None or cv2.pointPolygonTest(roi, point, False) >= 0:
+                    in_frame += 1
+                    if tracker.speed(track_id) is not None:
+                        speeds.append(tracker.speed(track_id))
 
                 if counter.update(track_id, voted_cls, prev, point, frame.shape):
                     traffic.record_crossing(voted_cls)
@@ -149,7 +175,7 @@ def main():
                     )
 
         counter.forget(tracker.prune(frame_idx))
-        traffic.record_frame(in_frame)
+        traffic.record_frame(in_frame, speeds)
 
         now = time.time()
         if now - last_save >= SAVE_INTERVAL:
@@ -161,7 +187,7 @@ def main():
         if draw:
             traffic_result = traffic.analyze(counter.get_result())
             draw_overlay(annotated, camera["name"], traffic_result,
-                         counter.pixel_line(frame.shape))
+                         counter.pixel_line(frame.shape), roi)
             if annotated.shape[1] > 1280:
                 r = 1280 / annotated.shape[1]
                 annotated = cv2.resize(annotated, (1280, int(annotated.shape[0] * r)))

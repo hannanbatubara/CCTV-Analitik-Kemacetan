@@ -49,6 +49,7 @@ class OutputManager:
         t = data["traffic"]
         print(
             f"[{data['timestamp']}] {data['camera_id']} | "
+            f"status={t['status']} (kecepatan {'-' if t['speed_ratio'] is None else t['speed_ratio']}x normal) | "
             f"density={t['density']} | in_frame={t['vehicles_in_frame']} "
             f"(avg {t['avg_vehicles_in_frame']}) | "
             f"flow/{t['window_seconds']}s={t['flow_in_window']['total']} | "
