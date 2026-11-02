@@ -88,8 +88,6 @@ tools/
   test_merge.py          tes merge_datasets.py
 tests/test_db.py         tes penyimpanan database
 
-docs/SERAH_TERIMA_SERVER.md         panduan pemasangan di server
-docs/validasi_manual/hasil_validasi.md   hitung manual vs program
 ```
 
 Tidak disertakan di repo: dataset, log, video uji, dan model lama (terlalu besar atau hanya untuk pengembangan).
@@ -118,7 +116,6 @@ docker compose down
 ```
 `data/`, `models/`, dan `logs/` di-mount dari host, jadi kamera, garis hitung, dan model bisa diganti tanpa build ulang
 (`docker compose restart worker`). Pengaturan server diisi di file `.env` (contoh di `.env.example`).
-Panduan lengkap untuk server: [docs/SERAH_TERIMA_SERVER.md](docs/SERAH_TERIMA_SERVER.md).
 
 ### Tes
 ```bash
@@ -328,7 +325,6 @@ Klip yang sama, detik 0 sampai 12,1, dihitung manual oleh satu orang:
 **Temuan utama: akurasi hitungan ditentukan oleh FPS pemrosesan.** Pada 3 FPS (batas CPU laptop) motor yang bergerak cepat
 berpindah terlalu jauh antar frame sehingga tracking putus. Pada 15 FPS hasilnya mendekati hitungan manual.
 Server produksi perlu memproses ±15 FPS per kamera (`PROCESS_FPS=15`, `TRACKER=bytetrack.yaml`), kemungkinan dengan GPU.
-Detail: [docs/validasi_manual/hasil_validasi.md](docs/validasi_manual/hasil_validasi.md).
 
 ### 8.3 Docker
 Diuji di Docker Desktop (Windows): image ±2,8 GB, worker ±580 MB RAM dan ±2,4 core pada 3 FPS. Worker membaca stream,

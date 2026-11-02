@@ -16,3 +16,6 @@ docs/validasi_manual/lembar_hitung.txt
 # model lama; yang dipakai: models/best_openvino_model_v2
 models/best.pt
 models/best_openvino_model/
+
+# catatan lokal, tidak masuk repo
+docs/
