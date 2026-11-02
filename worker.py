@@ -11,7 +11,7 @@ import time
 
 import cv2
 
-from config import CAMERAS_FILE, DEFAULT_LINE, SAVE_INTERVAL, VEHICLE_CLASSES
+from config import CAMERAS_FILE, DEFAULT_LINE, PROCESS_FPS, SAVE_INTERVAL, VEHICLE_CLASSES
 from counter import LineCounter
 from detector import Detector
 from output import OutputManager
@@ -34,6 +34,8 @@ def parse_args():
     p.add_argument("--camera", type=int, default=0, help="index kamera di cameras.json")
     p.add_argument("--source", help="override sumber video (mis. video_cctv.mp4)")
     p.add_argument("--loop", action="store_true", help="ulangi video file saat selesai")
+    p.add_argument("--record", help="simpan video beranotasi ke file .mp4 (mis. rekaman.mp4)")
+    p.add_argument("--duration", type=float, help="berhenti otomatis setelah sekian detik")
     return p.parse_args()
 
 
@@ -95,17 +97,22 @@ def main():
 
     if args.show:
         cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    draw = args.show or args.record
+    writer = None
 
     last_save = time.time()
     frame_idx = 0
     final_data = None
 
+    start = time.time()
     while running and not stream.ended:
+        if args.duration and time.time() - start >= args.duration:
+            break
         frame = stream.read()
         if frame is None:
             continue
         frame_idx += 1
-        annotated = frame.copy() if args.show else None
+        annotated = frame.copy() if draw else None
 
         result = detector.detect(frame)
         in_frame = 0
@@ -133,7 +140,7 @@ def main():
                     c = counter.totals[voted_cls]
                     tracker.set_number(track_id, c["in"] + c["out"])
 
-                if args.show:
+                if draw:
                     _, number = tracker.label(track_id)
                     text = voted_cls.upper() + (f" #{number}" if number else "")
                     draw_box_and_label(
@@ -151,16 +158,26 @@ def main():
             output.display(final_data)
             last_save = now
 
-        if args.show:
+        if draw:
             traffic_result = traffic.analyze(counter.get_result())
             draw_overlay(annotated, camera["name"], traffic_result,
                          counter.pixel_line(frame.shape))
             if annotated.shape[1] > 1280:
                 r = 1280 / annotated.shape[1]
                 annotated = cv2.resize(annotated, (1280, int(annotated.shape[0] * r)))
-            cv2.imshow(WINDOW_NAME, annotated)
-            if cv2.waitKey(1) == 27:
-                break
+            if args.record:
+                if writer is None:
+                    h, w = annotated.shape[:2]
+                    writer = cv2.VideoWriter(args.record, cv2.VideoWriter_fourcc(*"mp4v"), PROCESS_FPS, (w, h))
+                    written = 0
+                # frame diulang jika pemrosesan lebih lambat dari PROCESS_FPS, supaya video tetap berjalan seperti waktu nyata
+                while written < (time.time() - start) * PROCESS_FPS:
+                    writer.write(annotated)
+                    written += 1
+            if args.show:
+                cv2.imshow(WINDOW_NAME, annotated)
+                if cv2.waitKey(1) == 27:
+                    break
 
     print("Stopping CCTV Worker...")
     # simpan snapshot terakhir
@@ -169,6 +186,8 @@ def main():
     output.display(final_data)
 
     stream.release()
+    if writer is not None:
+        writer.release()
     if args.show:
         cv2.destroyAllWindows()
 

@@ -100,6 +100,7 @@ python worker.py                       # headless, sumber dari data/cameras.json
 python worker.py --show                # dengan jendela video (ESC untuk keluar)
 python worker.py --source video.mp4    # uji dengan file video
 python worker.py --camera 1            # pakai kamera ke-2 di cameras.json
+python worker.py --record rekaman.mp4 --duration 180   # rekam video beranotasi 3 menit lalu berhenti
 uvicorn api:app --port 8000            # API
 ```
 
