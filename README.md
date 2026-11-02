@@ -346,8 +346,24 @@ memuat model v2 dari volume, menulis snapshot ke `logs/`, dan API menjawab.
 
 ## 10. Sumber data dan lisensi
 
-- Dataset **Traffic**: Roboflow Universe, `iitp-w6lkv/traffic-er4bf` versi 1, lisensi CC BY 4.0.
-- Dataset **vehicle-det**: Roboflow Universe, `vehicledet/vehicle-det`, lisensi CC BY 4.0.
+### Dataset yang dipakai untuk training model v2
+| Dataset | Tautan | Lisensi | Pemakaian |
+|---|---|---|---|
+| Traffic (CCTV Indonesia), versi 1 | [universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1](https://universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1) | CC BY 4.0 | Semua gambar; `Bike` -> motor, `Other` dilewati |
+| vehicle-det, versi 1 | [universe.roboflow.com/vehicledet/vehicle-det/dataset/1](https://universe.roboflow.com/vehicledet/vehicle-det/dataset/1) | CC BY 4.0 | 1.000 dari 19.422 gambar, kelas dipetakan per ID |
+| Frame CCTV Balaikota Bogor | [app.roboflow.com/hannan-azhari-batubara/cctv-newak/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-newak/1) (privat) | Privat | 100 frame, diambil dari stream sendiri |
+
+### Dataset yang dipertimbangkan tetapi tidak dipakai
+| Dataset | Tautan | Alasan |
+|---|---|---|
+| cctv (baemsu), versi 1 | [universe.roboflow.com/baemsu/cctv-39zes/dataset/1](https://universe.roboflow.com/baemsu/cctv-39zes/dataset/1) | Hanya 8 gambar |
+| vehicle-detection (Shivin), versi 4 | [universe.roboflow.com/shivin/vehicle-detection-pvvca/dataset/4](https://universe.roboflow.com/shivin/vehicle-detection-pvvca/dataset/4) | Kelas tidak cocok dengan 4 kelas |
+| Vehicle_Detection_YOLOv8 (farzad), versi 3 | [universe.roboflow.com/farzad/vehicle_detection_yolov8/dataset/3](https://universe.roboflow.com/farzad/vehicle_detection_yolov8/dataset/3) | Hanya satu kelas "Vehicle" |
+| InaTRC (jalan tol Indonesia) | [data.mendeley.com/datasets/kddgphck3b/1](https://data.mendeley.com/datasets/kddgphck3b/1) | Mobil dan bus dalam satu kelas |
+| UA-DETRAC (makalah) | [arxiv.org/abs/1511.04136](https://arxiv.org/abs/1511.04136) | Tidak ada kelas motor |
+| BMD-45 (makalah) | [alphaxiv.org/abs/2604.24419](https://www.alphaxiv.org/abs/2604.24419) | Lisensi dan unduhan belum jelas |
+
+### Lainnya
 - Stream CCTV: Pemerintah Kota Bogor (restreamer publik).
 - Model dan library deteksi: [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics), lisensi AGPL-3.0.
   Bobot model di repo ini turunan dari YOLOv8 dan mengikuti lisensi tersebut.
