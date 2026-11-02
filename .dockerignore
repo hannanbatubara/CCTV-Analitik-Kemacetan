@@ -1,0 +1,13 @@
+__pycache__/
+logs/
+_backup_original/
+*.zip
+*.mp4
+models/best.pt
+traffic_data.json
+.git
+models/
+dataset/
+docs/validasi_manual/
+archive/
+dataset_gabungan/

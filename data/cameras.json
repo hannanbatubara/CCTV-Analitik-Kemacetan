@@ -1,0 +1,11 @@
+[
+    {
+        "id": "CAM_001",
+        "name": "Depan Kantor Balaikota Bogor",
+        "location": "BALAIKOTA_BOGOR",
+        "source": "https://restreamer3.kotabogor.go.id/memfs/e7d14e54-b9bd-474a-8976-dd08baec4498.m3u8",
+        "type": "stream",
+        "lane": 2,
+        "line": {"x1": 0.0, "y1": 0.4, "x2": 1.0, "y2": 0.4}
+    }
+]

@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.env
+
+# data & hasil berjalan (tidak masuk repo)
+logs/
+dataset/
+dataset_gabungan/
+archive/
+*.zip
+*.mp4
+traffic_data.json
+traffic_data.tmp
+docs/validasi_manual/lembar_hitung.txt
+
+# model lama; yang dipakai: models/best_openvino_model_v2
+models/best.pt
+models/best_openvino_model/

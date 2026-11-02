@@ -1,0 +1,20 @@
+services:
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env        # opsional; lihat .env.example
+        required: false
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models:ro   # ganti model tanpa rebuild
+      - ./data:/app/data:ro   # ganti sumber/garis kamera tanpa rebuild
+
+  api:
+    build: .
+    command: uvicorn api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs:/app/logs:ro
