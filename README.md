@@ -18,8 +18,7 @@ sendiri di server. Repo ini hanya berisi modul kemacetan.
 6. [Model](#6-model)
 7. [Riwayat percobaan](#7-riwayat-percobaan)
 8. [Hasil validasi](#8-hasil-validasi)
-9. [Keterbatasan dan pekerjaan lanjutan](#9-keterbatasan-dan-pekerjaan-lanjutan)
-10. [Sumber data dan lisensi](#10-sumber-data-dan-lisensi)
+9. [Sumber data dan lisensi](#9-sumber-data-dan-lisensi)
 
 ---
 
@@ -332,19 +331,7 @@ memuat model v2 dari volume, menulis snapshot ke `logs/`, dan API menjawab.
 
 ---
 
-## 9. Keterbatasan dan pekerjaan lanjutan
-
-- **Batas density belum dikalibrasi.** Nilai `8` / `20` masih awal. Data pengamatan 13:00-19:00 dikumpulkan untuk kalibrasi dengan `tools/calibrate_density.py` (persentil 33 dan 80).
-- **Kemungkinan tidak bekerja di malam hari.** Data 21:30-03:00 menunjukkan rata-rata hampir nol kendaraan di frame. Dugaan: model hanya dilatih dengan gambar siang. Belum diverifikasi secara visual.
-- **Validasi manual masih kecil:** satu klip 12,1 detik, satu pencacah, dibandingkan per total kelas (bukan per kendaraan).
-- **Label frame Bogor belum dikoreksi manual**, sehingga skor di validasi Bogor tidak bisa dijadikan ukuran akurasi.
-- **15 FPS belum dibuktikan secara langsung** (baru dengan memproses semua frame klip secara offline). Perlu diuji di server atau dengan GPU.
-- Penyimpanan ke database baru diuji dengan SQLite, belum dengan PostgreSQL sungguhan.
-- API belum memakai autentikasi; di server sebaiknya hanya untuk jaringan internal.
-
----
-
-## 10. Sumber data dan lisensi
+## 9. Sumber data dan lisensi
 
 ### Dataset yang dipakai untuk training model v2
 | Dataset | Tautan | Lisensi | Pemakaian |
