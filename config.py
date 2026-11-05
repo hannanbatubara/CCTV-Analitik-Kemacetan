@@ -50,6 +50,10 @@ MEDIUM_THRESHOLD = _env("MEDIUM_THRESHOLD", 20)  # < 20 -> MEDIUM, selebihnya HI
 FREE_FLOW_SPEED = _env("FREE_FLOW_SPEED", 1.0)   # kecepatan normal saat jalan lengang (kalibrasi: tools/calibrate_density.py)
 JAM_SPEED_RATIO = _env("JAM_SPEED_RATIO", 0.3)  # ramai + kecepatan < 30% normal -> MACET
 
+# Tampilan (--show / --record): 1 = gambar area hitung dan garis hitung di layar.
+# Hanya tampilan; area dan garis tetap dipakai untuk menghitung.
+SHOW_ZONES = _env("SHOW_ZONES", 0)
+
 # Penyimpanan
 SAVE_INTERVAL = _env("SAVE_INTERVAL", 10)       # detik
 LATEST_FILE = "logs/traffic_data.json"

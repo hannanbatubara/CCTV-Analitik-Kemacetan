@@ -155,6 +155,7 @@ Semua nilai di `config.py` bisa dioverride lewat environment variable dengan nam
 | `FREE_FLOW_SPEED` | `1.0` | Kecepatan normal saat jalan sepi. Dikalibrasi dengan `tools/calibrate_density.py` **pada `PROCESS_FPS` yang sama** (3 FPS: ±1,0; 15 FPS: ±1,6) |
 | `JAM_SPEED_RATIO` | `0.3` | Di bawah 30% kecepatan normal + jalan ramai = MACET |
 | `SAVE_INTERVAL` | `10` | Detik antar snapshot |
+| `SHOW_ZONES` | `0` | `1` = gambar area hitung (biru muda) dan garis hitung (merah) di layar `--show` / `--record`. Hanya tampilan; area dan garis tetap dipakai untuk menghitung |
 | `DATABASE_URL` | kosong | Contoh `postgresql+psycopg2://user:pass@host:5432/db`. Kosong = tanpa database |
 | `CAMERAS_FILE` | `data/cameras.json` | Daftar kamera |
 

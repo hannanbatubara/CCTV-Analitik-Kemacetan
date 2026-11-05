@@ -12,7 +12,7 @@ import time
 import cv2
 import numpy as np
 
-from config import CAMERAS_FILE, DEFAULT_LINE, PROCESS_FPS, SAVE_INTERVAL, VEHICLE_CLASSES
+from config import CAMERAS_FILE, DEFAULT_LINE, PROCESS_FPS, SAVE_INTERVAL, SHOW_ZONES, VEHICLE_CLASSES
 from counter import LineCounter
 from detector import Detector
 from output import OutputManager
@@ -63,9 +63,10 @@ def roi_pixels(roi, shape):
 
 def draw_overlay(frame, camera_name, traffic_result, line, roi):
     t = traffic_result
-    if roi is not None:
-        cv2.polylines(frame, [roi], True, (255, 255, 0), 2)
-    cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3)
+    if SHOW_ZONES:
+        if roi is not None:
+            cv2.polylines(frame, [roi], True, (255, 255, 0), 2)
+        cv2.line(frame, (line[0], line[1]), (line[2], line[3]), (0, 0, 255), 3)
     cv2.putText(frame, f"Camera: {camera_name}", (20, 35),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 255), 2, cv2.LINE_AA)
     speed = f"{t['speed_ratio'] * 100:.0f}% normal" if t["speed_ratio"] is not None else "-"
