@@ -456,10 +456,10 @@ kemungkinan sedikit lebih tinggi daripada performa pada malam lain.
 ### Dataset yang dipakai untuk training model v2 sampai v4
 | Dataset | Tautan | Lisensi | Pemakaian |
 |---|---|---|---|
-| Frame malam CCTV Balaikota Bogor (v3) | [app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1) (privat) | Privat | 200 frame, label auto-label GPT-6.1 Terra (Roboflow) |
+| Frame malam CCTV Balaikota Bogor (v3) | [app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-malam-gnh1t/1) (privat) | Privat | 200 fram
 | Traffic (CCTV Indonesia), versi 1 | [universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1](https://universe.roboflow.com/iitp-w6lkv/traffic-er4bf/dataset/1) | CC BY 4.0 | Semua gambar; `Bike` -> motor, `Other` dilewati |
 | vehicle-det, versi 1 | [universe.roboflow.com/vehicledet/vehicle-det/dataset/1](https://universe.roboflow.com/vehicledet/vehicle-det/dataset/1) | CC BY 4.0 | 1.000 dari 19.422 gambar, kelas dipetakan per ID |
-| Frame siang CCTV Balaikota Bogor (label v4) | [app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1) (privat) | Privat | 100 frame dari stream sendiri, label auto-label GPT-6.1 Terra (angkot -> car); label lama di project `cctv-newak` |
+| Frame siang CCTV Balaikota Bogor (label v4) | [app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1](https://app.roboflow.com/hannan-azhari-batubara/cctv-siang-fkh8l/1) (privat) | Privat | 100 frame dari stream sendiri (angkot -> car); label lama di project `cctv-newak` |
 
 ### Dataset yang dipertimbangkan tetapi tidak dipakai
 | Dataset | Tautan | Alasan |
