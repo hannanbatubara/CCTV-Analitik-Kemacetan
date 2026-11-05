@@ -45,6 +45,13 @@ class OutputManager:
         with open(history, "a", encoding="utf-8") as f:
             f.write(json.dumps(data) + "\n")
 
+        # 3. Database (jika DATABASE_URL diisi); gagal simpan tidak menghentikan worker
+        if self.db:
+            try:
+                self.db.save(data)
+            except Exception as e:
+                print(f"Gagal simpan ke database: {e}", flush=True)
+
     def display(self, data):
         t = data["traffic"]
         print(
