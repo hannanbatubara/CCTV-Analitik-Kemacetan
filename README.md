@@ -398,7 +398,11 @@ diubah ke `car` (79 kotak), 31 bus kota tetap `bus`. Label lama disimpan di luar
 |---|---|---|
 | v2 | 0,855 | 0,735 |
 | v3 | 0,885 | 0,729 |
-| **v4** | - | **0,828** |
+| **v4** | 0,818* | **0,828** |
+
+\* Diukur ulang di laptop dengan model OpenVINO (bukan `.pt` di Colab seperti angka lain). Dengan cara yang sama,
+label baru memberi 0,807, jadi selisih karena cara ukur ±0,02. Skor v4 pada label lama lebih rendah daripada v3
+karena v4 menemukan kendaraan yang tidak ada di label lama (dihitung sebagai salah), bukan karena v4 lebih buruk.
 
 Skor siang sebelumnya terlalu tinggi; dengan label yang benar model awal sampai v3 hanya menangkap ±65% kendaraan siang
 (kebanyakan yang terlewat adalah kendaraan kecil di kejauhan). v4 dilatih dari v3 dengan label baru ini.
